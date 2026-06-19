@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DSA Visualizer</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0a0e17;--surface:#111827;--surface2:#1a2236;--border:#253150;
+  --text:#e2e8f0;--muted:#8892b0;--accent:#6c5ce7;--accent2:#a29bfe;
+  --compare:#ef4444;--sorted:#22c55e;--default:#3b82f6;--swap:#f59e0b;
+  --pivot:#a855f7;--visited:#06b6d4;--found:#f97316;
+}
+body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
+header{background:linear-gradient(135deg,#111827 0%,#1a1040 100%);border-bottom:1px solid var(--border);padding:20px 32px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}
+header h1{font-size:1.6rem;font-weight:700;background:linear-gradient(135deg,var(--accent2),var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+header .subtitle{color:var(--muted);font-size:.85rem}
+.app{display:grid;grid-template-columns:280px 1fr;grid-template-rows:auto 1fr;min-height:calc(100vh - 72px)}
+.sidebar{grid-row:1/3;background:var(--surface);border-right:1px solid var(--border);padding:20px;overflow-y:auto;display:flex;flex-direction:column;gap:16px}
+.main-area{display:flex;flex-direction:column;gap:0}
+.controls{background:var(--surface);border-bottom:1px solid var(--border);padding:16px 24px;display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+.viz-container{flex:1;padding:24px;display:flex;flex-direction:column;gap:16px;min-height:0}
+.bar-chart{flex:1;display:flex;align-items:flex-end;gap:1px;padding:12px 4px 0;position:relative;min-height:300px}
+.bar{flex:1;min-width:2px;border-radius:3px 3px 0 0;transition:height .12s ease,background .12s ease;position:relative}
+.bar .label{position:absolute;bottom:calc(100% + 4px);left:50%;transform:translateX(-50%);font-size:10px;color:var(--muted);white-space:nowrap;display:none}
+.bar.highlight .label{display:block}
+.bar.comparing{background:var(--compare)!important}
+.bar.sorted{background:var(--sorted)!important}
+.bar.swapping{background:var(--swap)!important}
+.bar.pivot{background:var(--pivot)!important}
+.bar.visited{background:var(--visited)!important}
+.bar.found{background:var(--found)!important}
+.bar.default{background:var(--default)}
+.info-bar{display:flex;gap:24px;align-items:center;flex-wrap:wrap;padding:8px 0}
+.info-item{display:flex;align-items:center;gap:6px;font-size:.82rem}
+.info-item .count{color:var(--accent2);font-weight:600;font-size:.95rem}
+.btn{padding:8px 18px;border:1px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--text);cursor:pointer;font-size:.82rem;font-weight:500;transition:all .15s ease}
+.btn:hover{border-color:var(--accent);background:#1e2a48}
+.btn:active{transform:scale(.97)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.primary:hover{background:#5b4bd4}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn.active{border-color:var(--accent);box-shadow:0 0 12px rgba(108,92,231,.3)}
+select,input[type=range]{accent-color:var(--accent)}
+select{padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--text);font-size:.82rem;cursor:pointer}
+label{font-size:.82rem;color:var(--muted);display:flex;align-items:center;gap:8px}
+.ctrl-group{display:flex;flex-direction:column;gap:4px}
+.ctrl-group span{font-size:.75rem;color:var(--muted)}
+.speed-val,.size-val{color:var(--accent2);font-weight:600;min-width:28px;text-align:right}
+.legend{display:flex;gap:16px;flex-wrap:wrap;padding:4px 0}
+.legend-item{display:flex;align-items:center;gap:5px;font-size:.75rem;color:var(--muted)}
+.legend-dot{width:12px;height:12px;border-radius:3px}
+.desc-panel{background:var(--surface);border-top:1px solid var(--border);padding:16px 24px}
+.desc-panel h3{font-size:.9rem;color:var(--accent2);margin-bottom:8px}
+.desc-panel p{font-size:.82rem;color:var(--muted);line-height:1.6;margin-bottom:6px}
+.complexity{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin-top:8px}
+.complexity-card{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;text-align:center}
+.complexity-card .lbl{font-size:.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+.complexity-card .val{font-size:1rem;font-weight:700;color:var(--accent2);margin-top:2px}
+.sidebar h2{font-size:.85rem;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:4px}
+.algo-list{display:flex;flex-direction:column;gap:4px}
+.algo-btn{padding:10px 14px;border:1px solid transparent;border-radius:8px;background:transparent;color:var(--muted);cursor:pointer;text-align:left;font-size:.82rem;transition:all .15s;display:flex;align-items:center;gap:10px}
+.algo-btn:hover{background:var(--surface2);color:var(--text)}
+.algo-btn.active{background:rgba(108,92,231,.12);border-color:var(--accent);color:var(--text)}
+.algo-btn .icon{width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:700;background:var(--surface2);color:var(--accent2);flex-shrink:0}
+.algo-btn.active .icon{background:var(--accent);color:#fff}
+.algo-section-title{font-size:.7rem;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);margin-top:12px;margin-bottom:4px;opacity:.6}
+.graph-controls{display:none;gap:8px;flex-wrap:wrap;padding:12px;background:var(--surface2);border-radius:8px;border:1px solid var(--border)}
+.graph-controls.visible{display:flex}
+.status-msg{position:fixed;top:20px;right:20px;padding:10px 20px;border-radius:8px;font-size:.82rem;font-weight:500;z-index:100;opacity:0;transition:opacity .3s;pointer-events:none}
+.status-msg.show{opacity:1}
+.status-msg.success{background:#059669;color:#fff}
+.status-msg.info{background:var(--accent);color:#fff}
+@media(max-width:900px){
+  .app{grid-template-columns:1fr;grid-template-rows:auto auto 1fr}
+  .sidebar{grid-row:auto;flex-direction:row;overflow-x:auto;padding:12px;border-right:none;border-bottom:1px solid var(--border)}
+  .algo-list{flex-direction:row}
+  .algo-btn{white-space:nowrap}
+  .algo-section-title{display:none}
+}
+</style>
+</head>
+<body>
+<header>
+  <div><h1>DSA Visualizer</h1><span class="subtitle">Interactive Algorithm Visualization</span></div>
+  <div style="display:flex;gap:8px;align-items:center">
+    <span class="legend-item"><span class="legend-dot" style="background:var(--default)"></span>Default</span>
+    <span class="legend-item"><span class="legend-dot" style="background:var(--compare)"></span>Comparing</span>
+    <span class="legend-item"><span class="legend-dot" style="background:var(--swap)"></span>Swapping</span>
+    <span class="legend-item"><span class="legend-dot" style="background:var(--sorted)"></span>Sorted</span>
+  </div>
+</header>
+<div class="app">
+  <aside class="sidebar">
+    <div>
+      <h2>Sorting Algorithms</h2>
+      <div class="algo-list" id="sortAlgos">
+        <button class="algo-btn active" data-algo="bubble"><span class="icon">B</span>Bubble Sort</button>
+        <button class="algo-btn" data-algo="selection"><span class="icon">S</span>Selection Sort</button>
+        <button class="algo-btn" data-algo="insertion"><span class="icon">I</span>Insertion Sort</button>
+        <button class="algo-btn" data-algo="merge"><span class="icon">M</span>Merge Sort</button>
+        <button class="algo-btn" data-algo="quick"><span class="icon">Q</span>Quick Sort</button>
+      </div>
+    </div>
+    <div>
+      <h2>Searching Algorithms</h2>
+      <div class="algo-list" id="searchAlgos">
+        <button class="algo-btn" data-algo="linear"><span class="icon">L</span>Linear Search</button>
+        <button class="algo-btn" data-algo="binary"><span class="icon">B</span>Binary Search</button>
+      </div>
+    </div>
+    <div>
+      <h2>Graph Algorithms</h2>
+      <div class="algo-list" id="graphAlgos">
+        <button class="algo-btn" data-algo="bfs"><span class="icon">B</span>BFS</button>
+        <button class="algo-btn" data-algo="dfs"><span class="icon">D</span>DFS</button>
+      </div>
+    </div>
+  </aside>
+  <div class="main-area">
+    <div class="controls">
+      <button class="btn primary" id="playBtn">&#9654; Play</button>
+      <button class="btn" id="pauseBtn" disabled>&#10074;&#10074; Pause</button>
+      <button class="btn" id="stepBtn" disabled>&#9654;| Step</button>
+      <button class="btn" id="resetBtn">&#8634; Reset</button>
+      <button class="btn" id="genBtn">&#8644; Generate Array</button>
+      <div class="ctrl-group">
+        <label>Speed</label>
+        <div style="display:flex;align-items:center;gap:8px">
+          <input type="range" id="speedSlider" min="1" max="100" value="50">
+          <span class="speed-val" id="speedVal">50</span>
+        </div>
+      </div>
+      <div class="ctrl-group">
+        <label>Array Size</label>
+        <div style="display:flex;align-items:center;gap:8px">
+          <input type="range" id="sizeSlider" min="8" max="200" value="40">
+          <span class="size-val" id="sizeVal">40</span>
+        </div>
+      </div>
+      <div class="ctrl-group" id="searchTargetGroup" style="display:none">
+        <label>Search Target</label>
+        <input type="number" id="searchTarget" value="42" min="1" max="500" style="width:70px;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);color:var(--text);font-size:.82rem">
+      </div>
+    </div>
+    <div class="viz-container">
+      <div class="info-bar">
+        <div class="info-item">Comparisons: <span class="count" id="comparisons">0</span></div>
+        <div class="info-item">Swaps: <span class="count" id="swaps">0</span></div>
+        <div class="info-item">Array Access: <span class="count" id="accesses">0</span></div>
+        <div class="info-item" id="statusInfo" style="color:var(--accent2)">Ready</div>
+      </div>
+      <div class="bar-chart" id="barChart"></div>
+      <div class="desc-panel">
+        <h3 id="algoName">Bubble Sort</h3>
+        <p id="algoDesc">Bubble Sort repeatedly steps through the list, compares adjacent elements, and swaps them if they are in the wrong order. The pass through the list is repeated until the list is sorted.</p>
+        <div class="complexity" id="complexityCards">
+          <div class="complexity-card"><div class="lbl">Time (Best)</div><div class="val" id="cBest">O(n)</div></div>
+          <div class="complexity-card"><div class="lbl">Time (Avg)</div><div class="val" id="cAvg">O(n&sup2;)</div></div>
+          <div class="complexity-card"><div class="lbl">Time (Worst)</div><div class="val" id="cWorst">O(n&sup2;)</div></div>
+          <div class="complexity-card"><div class="lbl">Space</div><div class="val" id="cSpace">O(1)</div></div>
+          <div class="complexity-card"><div class="lbl">Stable</div><div class="val" id="cStable">Yes</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="status-msg" id="statusMsg"></div>
+
+<script>
+const $=s=>document.querySelector(s);
+const $$=s=>document.querySelectorAll(s);
+
+const ALGO_DATA={
+  bubble:{name:'Bubble Sort',desc:'Repeatedly steps through the list, compares adjacent elements, and swaps them if in the wrong order. Passes continue until no swaps are needed.',best:'O(n)',avg:'O(n&sup2;)',worst:'O(n&sup2;)',space:'O(1)',stable:'Yes',type:'sort'},
+  selection:{name:'Selection Sort',desc:'Divides the array into sorted and unsorted regions. Finds the minimum element from the unsorted region and moves it to the end of the sorted region.',best:'O(n&sup2;)',avg:'O(n&sup2;)',worst:'O(n&sup2;)',space:'O(1)',stable:'No',type:'sort'},
+  insertion:{name:'Insertion Sort',desc:'Builds the sorted array one element at a time by picking each element and placing it into its correct position among the previously sorted elements.',best:'O(n)',avg:'O(n&sup2;)',worst:'O(n&sup2;)',space:'O(1)',stable:'Yes',type:'sort'},
+  merge:{name:'Merge Sort',desc:'Divides the array in half, recursively sorts each half, then merges the sorted halves. Uses divide-and-conquer strategy with guaranteed O(n log n) performance.',best:'O(n log n)',avg:'O(n log n)',worst:'O(n log n)',space:'O(n)',stable:'Yes',type:'sort'},
+  quick:{name:'Quick Sort',desc:'Picks a pivot element, partitions the array so smaller elements go left and larger go right, then recursively sorts the partitions. Average-case champion.',best:'O(n log n)',avg:'O(n log n)',worst:'O(n&sup2;)',space:'O(log n)',stable:'No',type:'sort'},
+  linear:{name:'Linear Search',desc:'Sequentially checks each element in the array until the target value is found or the entire array has been searched.',best:'O(1)',avg:'O(n)',worst:'O(n)',space:'O(1)',stable:'N/A',type:'search'},
+  binary:{name:'Binary Search',desc:'Repeatedly divides a sorted array in half, comparing the target to the middle element and narrowing the search to the relevant half.',best:'O(1)',avg:'O(log n)',worst:'O(log n)',space:'O(1)',stable:'N/A',type:'search'},
+  bfs:{name:'Breadth-First Search',desc:'Explores the graph level by level, visiting all neighbors at the current depth before moving deeper. Uses a queue data structure.',best:'O(V+E)',avg:'O(V+E)',worst:'O(V+E)',space:'O(V)',stable:'N/A',type:'graph'},
+  dfs:{name:'Depth-First Search',desc:'Explores as far as possible along each branch before backtracking. Uses a stack (or recursion) data structure.',best:'O(V+E)',avg:'O(V+E)',worst:'O(V+E)',space:'O(V)',stable:'N/A',type:'graph'}
+};
+
+let arr=[];
+let running=false;
+let paused=false;
+let stepMode=false;
+let algo='bubble';
+let comparisons=0,swapCount=0,accessCount=0;
+let abortController=null;
+let speed=50;
+let arrSize=40;
+let searchTarget=42;
+let sortedIndices=new Set();
+
+function sleep(ms){return new Promise(r=>setTimeout(r,ms))}
+function getDelay(){return Math.max(1,Math.floor(200-speed*1.95))}
+
+function setStatus(msg,cls='info'){
+  const el=$('#statusMsg');
+  el.textContent=msg;el.className='status-msg show '+(cls||'');
+  setTimeout(()=>el.classList.remove('show'),2000);
+}
+
+function generateArray(){
+  running=false;paused=false;stepMode=false;abortController&&abortController.abort();
+  abortController=new AbortController();
+  arr=[];sortedIndices.clear();
+  for(let i=0;i<arrSize;i++) arr.push(Math.floor(Math.random()*480)+20);
+  comparisons=0;swapCount=0;accessCount=0;
+  updateCounters();
+  renderBars();
+  setStatus('Array generated','success');
+}
+
+function renderBars(highlightMap={}){
+  const chart=$('#barChart');
+  const maxVal=Math.max(...arr,1);
+  const h=chart.clientHeight-20;
+  let html='';
+  for(let i=0;i<arr.length;i++){
+    const bh=Math.max(2,(arr[i]/maxVal)*h);
+    let cls='bar default';
+    if(sortedIndices.has(i)) cls='bar sorted';
+    if(highlightMap[i]) cls='bar '+highlightMap[i];
+    html+=`<div class="${cls}" style="height:${bh}px"><span class="label">${arr[i]}</span></div>`;
+  }
+  chart.innerHTML=html;
+}
+
+function updateCounters(){
+  $('#comparisons').textContent=comparisons;
+  $('#swaps').textContent=swapCount;
+  $('#accesses').textContent=accessCount;
+}
+
+async function checkPaused(signal){
+  while(paused){
+    if(signal&&signal.aborted) throw 'aborted';
+    await sleep(50);
+  }
+  if(signal&&signal.aborted) throw 'aborted';
+}
+
+async function waitStep(signal){
+  if(stepMode){
+    paused=true;
+    $('#pauseBtn').textContent='▶ Resume';
+    while(paused){
+      if(signal&&signal.aborted) throw 'aborted';
+      await sleep(50);
+    }
+  }
+  if(signal&&signal.aborted) throw 'aborted';
+}
+
+function swap(i,j){
+  [arr[i],arr[j]]=[arr[j],arr[i]];
+  swapCount++;accessCount+=2;
+  updateCounters();
+}
+
+function compare(i,j){
+  comparisons++;accessCount+=2;
+  updateCounters();
+  return arr[i]-arr[j];
+}
+
+// ===== SORTING ALGORITHMS =====
+
+async function bubbleSort(signal){
+  const n=arr.length;
+  for(let i=0;i<n-1;i++){
+    for(let j=0;j<n-i-1;j++){
+      if(signal.aborted) throw 'aborted';
+      await checkPaused(signal);
+      renderBars({[j]:'comparing',[j+1]:'comparing'});
+      if(compare(j,j+1)>0){
+        await waitStep(signal);
+        swap(j,j+1);
+        renderBars({[j]:'swapping',[j+1]:'swapping'});
+      }
+      await sleep(getDelay());
+    }
+    sortedIndices.add(n-i-1);
+    renderBars({[n-i-1]:'sorted'});
+  }
+  sortedIndices.add(0);
+}
+
+async function selectionSort(signal){
+  const n=arr.length;
+  for(let i=0;i<n-1;i++){
+    let minIdx=i;
+    for(let j=i+1;j<n;j++){
+      if(signal.aborted) throw 'aborted';
+      await checkPaused(signal);
+      renderBars({[minIdx]:'pivot',[j]:'comparing'});
+      if(compare(j,minIdx)<0) minIdx=j;
+      await sleep(getDelay());
+    }
+    if(minIdx!==i){
+      await waitStep(signal);
+      swap(i,minIdx);
+      renderBars({[i]:'swapping',[minIdx]:'swapping'});
+      await sleep(getDelay());
+    }
+    sortedIndices.add(i);
+    renderBars({[i]:'sorted'});
+  }
+  sortedIndices.add(n-1);
+}
+
+async function insertionSort(signal){
+  const n=arr.length;
+  sortedIndices.add(0);
+  for(let i=1;i<n;i++){
+    if(signal.aborted) throw 'aborted';
+    let j=i;
+    while(j>0){
+      if(signal.aborted) throw 'aborted';
+      await checkPaused(signal);
+      renderBars({[j]:'comparing',[j-1]:'comparing'});
+      if(compare(j-1,j)>0){
+        await waitStep(signal);
+        swap(j,j-1);
+        renderBars({[j]:'swapping',[j-1]:'swapping'});
+        await sleep(getDelay());
+        j--;
+      } else break;
+    }
+    sortedIndices.clear();
+    for(let k=0;k<=i;k++) sortedIndices.add(k);
+    renderBars();
+  }
+}
+
+async function mergeSort(signal){
+  async function merge(l,m,r){
+    const left=arr.slice(l,m+1);
+    const right=arr.slice(m+1,r+1);
+    let i=0,j=0,k=l;
+    while(i<left.length&&j<right.length){
+      if(signal.aborted) throw 'aborted';
+      await checkPaused(signal);
+      comparisons++;accessCount+=2;updateCounters();
+      renderBars({[k]:'comparing'});
+      if(left[i]<=right[j]){
+        arr[k]=left[i];i++;
+      }else{
+        arr[k]=right[j];j++;
+        swapCount++;
+      }
+      accessCount++;
+      renderBars({[k]:'swapping'});
+      await sleep(getDelay());
+      k++;
+    }
+    while(i<left.length){
+      if(signal.aborted) throw 'aborted';
+      arr[k]=left[i];i++;k++;accessCount++;
+      renderBars({[k-1]:'swapping'});
+      await sleep(getDelay());
+    }
+    while(j<right.length){
+      if(signal.aborted) throw 'aborted';
+      arr[k]=right[j];j++;k++;accessCount++;
+      renderBars({[k-1]:'swapping'});
+      await sleep(getDelay());
+    }
+    updateCounters();
+  }
+  async function sort(l,r,signal){
+    if(l>=r||signal.aborted) return;
+    const m=Math.floor((l+r)/2);
+    await sort(l,m,signal);
+    await sort(m+1,r,signal);
+    await merge(l,m,r);
+  }
+  await sort(0,arr.length-1,signal);
+}
+
+async function quickSort(signal){
+  async function partition(low,high){
+    const pivot=arr[high];
+    let i=low-1;
+    for(let j=low;j<high;j++){
+      if(signal.aborted) throw 'aborted';
+      await checkPaused(signal);
+      comparisons++;accessCount+=2;updateCounters();
+      renderBars({[j]:'comparing',[high]:'pivot'});
+      if(arr[j]<pivot){
+        i++;
+        if(i!==j){swap(i,j);renderBars({[i]:'swapping',[j]:'swapping'});await sleep(getDelay());}
+      }
+      await sleep(Math.floor(getDelay()/2));
+    }
+    if(i+1!==high){swap(i+1,high);renderBars({[i+1]:'swapping',[high]:'swapping'});await sleep(getDelay());}
+    sortedIndices.add(i+1);
+    return i+1;
+  }
+  async function sort(low,high,signal){
+    if(low>=high||signal.aborted) return;
+    const p=await partition(low,high);
+    await sort(low,p-1,signal);
+    await sort(p+1,high,signal);
+  }
+  await sort(0,arr.length-1,signal);
+}
+
+// ===== SEARCHING ALGORITHMS =====
+
+async function linearSearch(signal){
+  const n=arr.length;
+  for(let i=0;i<n;i++){
+    if(signal.aborted) throw 'aborted';
+    await checkPaused(signal);
+    comparisons++;accessCount++;updateCounters();
+    renderBars({[i]:'comparing'});
+    await sleep(getDelay());
+    if(arr[i]===searchTarget){
+      renderBars({[i]:'found'});
+      return true;
+    }
+    renderBars({[i]:'visited'});
+  }
+  return false;
+}
+
+async function binarySearch(signal){
+  arr.sort((a,b)=>a-b);
+  renderBars();
+  await sleep(getDelay()*2);
+  let lo=0,hi=arr.length-1;
+  while(lo<=hi){
+    if(signal.aborted) throw 'aborted';
+    await checkPaused(signal);
+    const mid=Math.floor((lo+hi)/2);
+    comparisons++;accessCount++;updateCounters();
+    const hm={};
+    for(let i=lo;i<=hi;i++) hm[i]='visited';
+    hm[mid]='pivot';
+    renderBars(hm);
+    await sleep(getDelay());
+    if(arr[mid]===searchTarget){
+      renderBars({[mid]:'found'});
+      return true;
+    }
+    if(arr[mid]<searchTarget) lo=mid+1;
+    else hi=mid-1;
+  }
+  return false;
+}
+
+// ===== GRAPH ALGORITHMS =====
+
+function buildGraph(){
+  const n=Math.min(arrSize,20);
+  const nodes=[];
+  const edges=[];
+  const adj={};
+  for(let i=0;i<n;i++){nodes.push(i);adj[i]=[];}
+  for(let i=0;i<n;i++){
+    const numEdges=Math.floor(Math.random()*3)+1;
+    for(let e=0;e<numEdges;e++){
+      let j=Math.floor(Math.random()*n);
+      if(j!==i&&!adj[i].includes(j)){
+        edges.push([i,j]);
+        adj[i].push(j);
+        adj[j].push(i);
+      }
+    }
+  }
+  return{nodes,edges,adj,n};
+}
+
+function renderGraph(graph,visited=new Set(),current=null,queue=null){
+  const chart=$('#barChart');
+  const n=graph.n;
+  const w=chart.clientWidth;
+  const h=chart.clientHeight;
+  const cx=w/2,cy=h/2;
+  const R=Math.min(w,h)*0.35;
+  const positions=[];
+  for(let i=0;i<n;i++){
+    const angle=(2*Math.PI*i/n)-Math.PI/2;
+    positions.push({x:cx+R*Math.cos(angle),y:cy+R*Math.sin(angle)});
+  }
+  let svg=`<svg width="${w}" height="${h}" style="position:absolute;top:0;left:0">`;
+  for(const[a,b]of graph.edges){
+    const pa=positions[a],pb=positions[b];
+    svg+=`<line x1="${pa.x}" y1="${pa.y}" x2="${pb.x}" y2="${pb.y}" stroke="#253150" stroke-width="2"/>`;
+  }
+  for(let i=0;i<n;i++){
+    const p=positions[i];
+    let fill='var(--default)';
+    if(visited.has(i)) fill='var(--sorted)';
+    if(current===i) fill='var(--found)';
+    if(queue&&queue.includes(i)) fill='var(--swap)';
+    svg+=`<circle cx="${p.x}" cy="${p.y}" r="22" fill="${fill}" stroke="#fff" stroke-width="2"/>`;
+    svg+=`<text x="${p.x}" y="${p.y+5}" text-anchor="middle" fill="#fff" font-size="13" font-weight="600">${i}</text>`;
+  }
+  svg+=`</svg>`;
+  chart.innerHTML=svg;
+}
+
+async function bfs(graph,start=0,signal){
+  const visited=new Set();
+  const queue=[start];
+  visited.add(start);
+  renderGraph(graph,visited,start,queue);
+  await sleep(getDelay()*3);
+  while(queue.length){
+    if(signal.aborted) throw 'aborted';
+    await checkPaused(signal);
+    const node=queue.shift();
+    comparisons++;accessCount++;updateCounters();
+    renderGraph(graph,visited,node,queue);
+    await sleep(getDelay()*2);
+    for(const neighbor of graph.adj[node]){
+      if(!visited.has(neighbor)){
+        visited.add(neighbor);
+        queue.push(neighbor);
+        accessCount++;
+        updateCounters();
+      }
+    }
+    renderGraph(graph,visited,node,queue);
+    await sleep(getDelay());
+  }
+  renderGraph(graph,visited);
+}
+
+async function dfs(graph,start=0,signal){
+  const visited=new Set();
+  async function visit(node){
+    if(signal.aborted) throw 'aborted';
+    await checkPaused(signal);
+    visited.add(node);
+    comparisons++;accessCount++;updateCounters();
+    renderGraph(graph,visited,node);
+    await sleep(getDelay()*2);
+    for(const neighbor of graph.adj[node]){
+      if(!visited.has(neighbor)){
+        await visit(neighbor);
+        renderGraph(graph,visited,node);
+        await sleep(Math.floor(getDelay()/2));
+      }
+    }
+  }
+  await visit(start);
+  renderGraph(graph,visited);
+}
+
+// ===== CONTROLS =====
+
+async function startAlgo(){
+  if(running) return;
+  running=true;paused=false;
+  abortController=new AbortController();
+  const signal=abortController.signal;
+  $('#playBtn').disabled=true;
+  $('#pauseBtn').disabled=false;
+  $('#stepBtn').disabled=false;
+  $('#statusInfo').textContent='Running...';
+  const a=ALGO_DATA[algo];
+  if(a.type==='graph'){
+    const graph=buildGraph();
+    try{
+      if(algo==='bfs') await bfs(graph,0,signal);
+      else await dfs(graph,0,signal);
+    }catch(e){if(e!=='aborted') console.error(e);}
+  }else{
+    try{
+      if(algo==='bubble') await bubbleSort(signal);
+      else if(algo==='selection') await selectionSort(signal);
+      else if(algo==='insertion') await insertionSort(signal);
+      else if(algo==='merge') await mergeSort(signal);
+      else if(algo==='quick') await quickSort(signal);
+      else if(algo==='linear') await linearSearch(signal);
+      else if(algo==='binary') await binarySearch(signal);
+    }catch(e){if(e!=='aborted') console.error(e);}
+  }
+  if(!signal.aborted){
+    if(a.type==='sort'){
+      sortedIndices.clear();
+      for(let i=0;i<arr.length;i++) sortedIndices.add(i);
+      renderBars();
+    }
+    $('#statusInfo').textContent='Done!';
+    setStatus('Algorithm completed','success');
+  }else{
+    $('#statusInfo').textContent='Stopped';
+  }
+  running=false;
+  $('#playBtn').disabled=false;
+  $('#pauseBtn').disabled=true;
+  $('#stepBtn').disabled=true;
+}
+
+$('#playBtn').onclick=startAlgo;
+
+$('#pauseBtn').onclick=()=>{
+  if(!running) return;
+  if(stepMode){stepMode=false;}
+  paused=!paused;
+  $('#pauseBtn').textContent=paused?'▶ Resume':'⏸ Pause';
+};
+
+$('#stepBtn').onclick=()=>{
+  if(!running) return;
+  if(paused){paused=false;}
+  else{stepMode=true;paused=true;}
+};
+
+$('#resetBtn').onclick=()=>{
+  running=false;paused=false;stepMode=false;
+  abortController&&abortController.abort();
+  sortedIndices.clear();
+  generateArray();
+};
+
+$('#genBtn').onclick=()=>{generateArray();};
+
+$('#speedSlider').oninput=e=>{
+  speed=+e.target.value;
+  $('#speedVal').textContent=speed;
+};
+
+$('#sizeSlider').oninput=e=>{
+  arrSize=+e.target.value;
+  $('#sizeVal').textContent=arrSize;
+};
+$('#sizeSlider').onchange=()=>{generateArray();};
+
+$('#searchTarget').oninput=e=>{searchTarget=+e.target.value;};
+
+$$('.algo-btn').forEach(btn=>{
+  btn.onclick=()=>{
+    if(running) return;
+    $$('.algo-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    algo=btn.dataset.algo;
+    const a=ALGO_DATA[algo];
+    $('#algoName').textContent=a.name;
+    $('#algoDesc').innerHTML=a.desc;
+    $('#cBest').innerHTML=a.best;
+    $('#cAvg').innerHTML=a.avg;
+    $('#cWorst').innerHTML=a.worst;
+    $('#cSpace').innerHTML=a.space;
+    $('#cStable').textContent=a.stable;
+    $('#searchTargetGroup').style.display=a.type==='search'?'flex':'none';
+    if(a.type==='graph'){
+      $('#sizeSlider').max=20;
+      if(arrSize>20){arrSize=20;$('#sizeSlider').value=20;$('#sizeVal').textContent=20;}
+      const graph=buildGraph();
+      renderGraph(graph);
+    }else{
+      $('#sizeSlider').max=200;
+      generateArray();
+    }
+  };
+});
+
+window.addEventListener('resize',()=>{
+  const a=ALGO_DATA[algo];
+  if(a.type==='graph'&&!running){
+    const graph=buildGraph();
+    renderGraph(graph);
+  }else if(!running){
+    renderBars();
+  }
+});
+
+generateArray();
+</script>
+</body>
+</html>
